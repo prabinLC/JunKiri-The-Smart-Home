@@ -50,6 +50,12 @@ public:
   void printData();
   bool isDataValid();
   unsigned long getLastReadTime();
+  
+  // Demo data methods for when sensor is not available
+  float getDemoPM25();
+  float getDemoPM10();
+  String getDemoHealthStatus();
+  String getDemoRiskLevel();
 };
 
 #endif

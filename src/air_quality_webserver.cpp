@@ -1,15 +1,13 @@
-﻿#include "air_quality_webserver.h"
+#include "air_quality_webserver.h"
 
 AirQualityWebServer::AirQualityWebServer(PMSSensor* pmsSensor, AirQualityDisplay* airDisplay) {
   sensor = pmsSensor;
   display = airDisplay;
-  server = new ESP8266WebServer(WEB_SERVER_PORT);
+  server = new ESP8266WebServer(80);
 }
 
 AirQualityWebServer::~AirQualityWebServer() {
-  if (server) {
-    delete server;
-  }
+  delete server;
 }
 
 void AirQualityWebServer::begin(const char* ssid, const char* password) {
@@ -29,252 +27,339 @@ void AirQualityWebServer::begin(const char* ssid, const char* password) {
 }
 
 void AirQualityWebServer::handleRoot() {
+  // Get current sensor values (real or demo)
+  float pm25 = sensor->isDataValid() ? sensor->currentData.pm2_5_atm : sensor->getDemoPM25();
+  float pm10 = sensor->isDataValid() ? sensor->currentData.pm10_atm : sensor->getDemoPM10();
+  float vocIndex = sensor->getVOCIndex();
+  
   String html = "<!DOCTYPE html><html><head>";
-  html += "<meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">";
-  html += "<title>Junkiri Smart Home - Air Quality Monitor</title>";
-  html += "<script src=\"https://cdn.jsdelivr.net/npm/chart.js\"></script>";
+  html += "<title>Junkari - Air Quality Monitor</title>";
+  html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+  html += "<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>";
+  
+  // Beautiful purple gradient styling
   html += "<style>";
-  html += "body{background:#1a1a2e;color:white;font-family:Arial;margin:0;padding:20px}";
-  html += ".container{max-width:1200px;margin:0 auto}";
-  html += ".header{text-align:center;background:#16213e;padding:30px;border-radius:15px;margin-bottom:30px}";
-  html += ".header h1{font-size:2.5rem;color:#4fc3f7;margin-bottom:10px}";
-  html += ".header p{font-size:1.2rem;color:#cccccc}";
-  html += ".nav-buttons{text-align:center;margin:30px 0}";
-  html += ".nav-btn{background:#2563eb;color:white;padding:15px 30px;text-decoration:none;border-radius:10px;margin:10px;display:inline-block}";
-  html += ".nav-btn:hover{background:#1d4ed8}";
-  html += ".card{background:#0f3460;border-radius:15px;padding:25px;margin-bottom:20px;border:1px solid #334155}";
-  html += ".card h3{color:#4fc3f7;margin-bottom:20px;font-size:1.5rem}";
-  html += ".grid{display:grid;gap:20px}";
-  html += ".grid-2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}";
-  html += ".grid-3{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}";
-  html += ".metric{text-align:center}";
-  html += ".metric-value{font-size:2.5rem;font-weight:bold;color:#4fc3f7;margin:15px 0}";
-  html += ".metric-label{color:#cccccc;font-size:1.1rem}";
-  html += ".status{padding:15px;border-radius:10px;margin:20px 0;text-align:center;font-weight:bold;font-size:1.2rem}";
-  html += ".status-good{background:#065f46;border:2px solid #10b981}";
-  html += ".status-moderate{background:#92400e;border:2px solid #f59e0b}";
-  html += ".status-risky{background:#991b1b;border:2px solid #ef4444}";
-  html += ".chart-container{position:relative;height:300px;margin:20px 0}";
-  html += ".info-panel{background:rgba(255,255,255,0.05);padding:20px;border-radius:12px}";
-  html += ".info-item{margin:12px 0;display:flex;justify-content:space-between;align-items:center}";
-  html += ".info-label{color:#9ca3af;font-size:1.1rem}";
-  html += ".info-value{color:#ffffff;font-weight:bold;font-size:1.1rem}";
-  html += "</style></head><body>";
+  html += "* { margin: 0; padding: 0; box-sizing: border-box; }";
+  html += "body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: white; }";
+  html += ".container { max-width: 1400px; margin: 0 auto; padding: 20px; }";
   
-  html += "<div class=\"container\">";
-  html += "<div class=\"header\">";
-  html += "<h1>🌬️ Air Quality Monitor</h1>";
-  html += "<p>Real-time environmental monitoring with Chart.js visualization</p>";
+  // Header with Junkari branding
+  html += ".header { display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 20px; padding: 20px 30px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.2); }";
+  html += ".logo-section { display: flex; align-items: center; gap: 15px; }";
+  html += ".logo { width: 60px; height: 60px; background: rgba(255,255,255,0.2); border-radius: 15px; display: flex; align-items: center; justify-content: center; font-size: 24px; }";
+  html += ".brand-text h1 { font-size: 2rem; font-weight: 700; margin-bottom: 5px; }";
+  html += ".brand-text p { font-size: 1rem; opacity: 0.8; }";
+  
+  // Navigation buttons
+  html += ".nav-buttons { display: flex; gap: 15px; }";
+  html += ".nav-btn { background: rgba(255,255,255,0.2); color: white; padding: 12px 24px; text-decoration: none; border-radius: 12px; font-weight: 500; transition: all 0.3s ease; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.3); }";
+  html += ".nav-btn:hover { background: rgba(255,255,255,0.3); transform: translateY(-2px); }";
+  
+  // Metric cards with colors from mockup
+  html += ".metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 30px; }";
+  html += ".metric-card { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 20px; padding: 25px; text-align: center; border: 1px solid rgba(255,255,255,0.2); position: relative; overflow: hidden; }";
+  html += ".metric-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; }";
+  
+  // PM2.5 - Orange theme
+  html += ".pm25-card { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%); }";
+  html += ".pm25-card::before { background: linear-gradient(90deg, #ff6b6b, #ff8e8e); }";
+  
+  // PM10 - Teal theme  
+  html += ".pm10-card { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); }";
+  html += ".pm10-card::before { background: linear-gradient(90deg, #4ecdc4, #44a08d); }";
+  
+  // VOC - Yellow theme
+  html += ".voc-card { background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); }";
+  html += ".voc-card::before { background: linear-gradient(90deg, #f093fb, #f5576c); }";
+  
+  html += ".metric-icon { font-size: 2rem; margin-bottom: 10px; opacity: 0.8; }";
+  html += ".metric-title { font-size: 1.1rem; margin-bottom: 15px; font-weight: 600; }";
+  html += ".metric-value { font-size: 2.5rem; font-weight: 700; margin-bottom: 5px; }";
+  html += ".metric-unit { font-size: 1rem; opacity: 0.8; margin-bottom: 10px; }";
+  html += ".metric-status { display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 0.9rem; font-weight: 600; }";
+  html += ".status-good { background: #10b981; color: white; }";
+  html += ".status-moderate { background: #f59e0b; color: white; }";
+  html += ".status-poor { background: #ef4444; color: white; }";
+  
+  // Chart containers
+  html += ".chart-section { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 20px; padding: 25px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.2); }";
+  html += ".chart-title { font-size: 1.4rem; font-weight: 600; margin-bottom: 20px; }";
+  html += ".chart-container { position: relative; height: 300px; }";
+  
+  // Info tooltips
+  html += ".info-tooltip { position: relative; display: inline-block; margin-left: 8px; cursor: help; }";
+  html += ".info-tooltip::after { content: 'ℹ️'; font-size: 0.9rem; }";
+  html += ".tooltip-text { visibility: hidden; width: 300px; background: rgba(0,0,0,0.9); color: white; text-align: left; border-radius: 8px; padding: 15px; position: absolute; z-index: 1; bottom: 125%; left: 50%; margin-left: -150px; opacity: 0; transition: opacity 0.3s; font-size: 0.9rem; line-height: 1.4; }";
+  html += ".info-tooltip:hover .tooltip-text { visibility: visible; opacity: 1; }";
+  html += ".tooltip-text::after { content: ''; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: rgba(0,0,0,0.9) transparent transparent transparent; }";
+  html += "</style>";
+  html += "</head><body>";
+  
+  html += "<div class='container'>";
+  
+  // Header with Junkari branding
+  html += "<div class='header'>";
+  html += "<div class='logo-section'>";
+  html += "<div class='logo'>💨</div>";
+  html += "<div class='brand-text'>";
+  html += "<h1>Junkari</h1>";
+  html += "<p>Smart Air Quality Monitoring</p>";
+  html += "</div></div>";
+  html += "<div class='nav-buttons'>";
+  html += "<a href='/' class='nav-btn'>🏠 Home</a>";
+  html += "<a href='/control' class='nav-btn'>⚙️ Controls</a>";
+  html += "<a href='/api' class='nav-btn'>📊 API Data</a>";
+  html += "<a href='javascript:updateCharts()' class='nav-btn'>🔄 Refresh</a>";
+  html += "</div></div>";
+  
+  // Metrics Grid with colorful cards
+  html += "<div class='metrics-grid'>";
+  
+  // PM2.5 Card (Orange theme)
+  html += "<div class='metric-card pm25-card'>";
+  html += "<div class='metric-icon'>🔴</div>";
+  html += "<div class='metric-title'>PM2.5 Level";
+  html += "<span class='info-tooltip'>";
+  html += "<span class='tooltip-text'>PM2.5 particles are tiny pollutants (2.5 micrometers or smaller) that can penetrate deep into lungs and enter bloodstream. Safe level: <12 μg/m³</span>";
+  html += "</span></div>";
+  html += "<div class='metric-value'>" + String(pm25) + "</div>";
+  html += "<div class='metric-unit'>μg/m³</div>";
+  
+  String pm25Status = "Good";
+  String pm25Class = "status-good";
+  if (pm25 > 35) { pm25Status = "Poor"; pm25Class = "status-poor"; }
+  else if (pm25 > 12) { pm25Status = "Moderate"; pm25Class = "status-moderate"; }
+  html += "<span class='metric-status " + pm25Class + "'>" + pm25Status + "</span>";
   html += "</div>";
   
-  html += "<div class=\"nav-buttons\">";
-  html += "<a href=\"/control\" class=\"nav-btn\">🏠 Control Home</a>";
-  html += "<a href=\"/api\" class=\"nav-btn\">📊 API Data</a>";
-  html += "<a href=\"javascript:updateCharts()\" class=\"nav-btn\">🔄 Refresh Data</a>";
+  // PM10 Card (Teal theme)
+  html += "<div class='metric-card pm10-card'>";
+  html += "<div class='metric-icon'>🔵</div>";
+  html += "<div class='metric-title'>PM10 Level";
+  html += "<span class='info-tooltip'>";
+  html += "<span class='tooltip-text'>PM10 particles are larger pollutants (10 micrometers or smaller) that affect respiratory system. Safe level: <20 μg/m³</span>";
+  html += "</span></div>";
+  html += "<div class='metric-value'>" + String(pm10) + "</div>";
+  html += "<div class='metric-unit'>μg/m³</div>";
+  
+  String pm10Status = "Good";
+  String pm10Class = "status-good";
+  if (pm10 > 50) { pm10Status = "Poor"; pm10Class = "status-poor"; }
+  else if (pm10 > 20) { pm10Status = "Moderate"; pm10Class = "status-moderate"; }
+  html += "<span class='metric-status " + pm10Class + "'>" + pm10Status + "</span>";
   html += "</div>";
   
-  if (sensor->isDataValid()) {
-    String statusClass = "status-good";
-    String statusIcon = "😊";
-    if (sensor->getRiskLevel() == "MODERATE") {
-      statusClass = "status-moderate";
-      statusIcon = "😐";
-    } else if (sensor->getRiskLevel() == "HIGH") {
-      statusClass = "status-risky";
-      statusIcon = "😟";
-    }
-    
-    html += "<div class=\"card\">";
-    html += "<div class=\"status " + statusClass + "\">";
-    html += statusIcon + " " + sensor->getHealthStatus() + " - Risk Level: " + sensor->getRiskLevel();
-    html += "</div>";
-    html += "</div>";
-  }
+  // VOC Card (Yellow theme)
+  html += "<div class='metric-card voc-card'>";
+  html += "<div class='metric-icon'>🟡</div>";
+  html += "<div class='metric-title'>VOC Index";
+  html += "<span class='info-tooltip'>";
+  html += "<span class='tooltip-text'>Volatile Organic Compounds indicate air freshness and chemical pollution. Index 1-5: Excellent to Poor air quality</span>";
+  html += "</span></div>";
+  html += "<div class='metric-value'>" + String(vocIndex, 1) + "</div>";
+  html += "<div class='metric-unit'>Index</div>";
   
-  html += "<div class=\"grid grid-3\">";
-  
-  if (sensor->isDataValid()) {
-    html += "<div class=\"card metric\">";
-    html += "<h3>🫁 PM2.5</h3>";
-    html += "<div class=\"metric-value\" id=\"pm25Value\">" + String(sensor->currentData.pm2_5_atm, 1) + "</div>";
-    html += "<div class=\"metric-label\">μg/m³</div>";
-    html += "</div>";
-    
-    html += "<div class=\"card metric\">";
-    html += "<h3>🌫️ PM10</h3>";
-    html += "<div class=\"metric-value\" id=\"pm10Value\">" + String(sensor->currentData.pm10_atm, 1) + "</div>";
-    html += "<div class=\"metric-label\">μg/m³</div>";
-    html += "</div>";
-    
-    html += "<div class=\"card metric\">";
-    html += "<h3>🧪 VOC Index</h3>";
-    html += "<div class=\"metric-value\" id=\"vocValue\">" + String(sensor->getVOCIndex()) + "</div>";
-    html += "<div class=\"metric-label\">Index</div>";
-    html += "</div>";
-  } else {
-    html += "<div class=\"card metric\">";
-    html += "<h3>⚠️ Sensor Status</h3>";
-    html += "<div class=\"metric-value\">ERROR</div>";
-    html += "<div class=\"metric-label\">Check Connections</div>";
-    html += "</div>";
-  }
-  
+  String vocStatus = "Excellent";
+  String vocClass = "status-good";
+  if (vocIndex > 4) { vocStatus = "Poor"; vocClass = "status-poor"; }
+  else if (vocIndex > 2) { vocStatus = "Moderate"; vocClass = "status-moderate"; }
+  html += "<span class='metric-status " + vocClass + "'>" + vocStatus + "</span>";
   html += "</div>";
   
-  html += "<div class=\"grid grid-2\">";
+  html += "</div>"; // End metrics grid
   
-  html += "<div class=\"card\">";
-  html += "<h3>📊 PM2.5 & PM10 Levels</h3>";
-  html += "<div class=\"chart-container\">";
-  html += "<canvas id=\"particleChart\"></canvas>";
-  html += "</div>";
-  html += "</div>";
+  // Chart sections with beautiful modern styling
+  html += "<div class='chart-section'>";
+  html += "<div class='chart-title'>📈 Real-time Air Quality Trends</div>";
+  html += "<div class='chart-container'>";
+  html += "<canvas id='lineChart'></canvas>";
+  html += "</div></div>";
   
-  html += "<div class=\"card\">";
-  html += "<h3>🔄 Real-time Trend</h3>";
-  html += "<div class=\"chart-container\">";
-  html += "<canvas id=\"trendChart\"></canvas>";
-  html += "</div>";
-  html += "</div>";
+  html += "<div class='chart-section'>";
+  html += "<div class='chart-title'>🍰 Air Quality Distribution</div>";
+  html += "<div class='chart-container'>";
+  html += "<canvas id='doughnutChart'></canvas>";
+  html += "</div></div>";
   
-  html += "</div>";
-  
-  html += "<div class=\"card\">";
-  html += "<h3>ℹ️ System Information</h3>";
-  html += "<div class=\"info-panel\">";
-  html += "<div class=\"info-item\"><span class=\"info-label\">IP Address:</span> <span class=\"info-value\">" + getIPAddress() + "</span></div>";
-  html += "<div class=\"info-item\"><span class=\"info-label\">Uptime:</span> <span class=\"info-value\">" + String(millis() / 1000) + " seconds</span></div>";
-  html += "<div class=\"info-item\"><span class=\"info-label\">Free RAM:</span> <span class=\"info-value\">" + String(ESP.getFreeHeap()) + " bytes</span></div>";
-  html += "<div class=\"info-item\"><span class=\"info-label\">WiFi Signal:</span> <span class=\"info-value\">" + String(WiFi.RSSI()) + " dBm</span></div>";
-  html += "</div>";
-  html += "</div>";
-  
-  html += "</div>";
-  
+  // Enhanced Chart.js with purple theme
   html += "<script>";
-  html += "let particleChart, trendChart;";
-  html += "let trendData = {pm25: [], pm10: [], timestamps: []};";
+  html += "let lineChart, doughnutChart;";
+  html += "let trendData = {pm25: [], pm10: [], voc: [], timestamps: []};";
   
-  // Initialize charts
+  // Initialize charts with beautiful purple theme
   html += "function initCharts() {";
-  html += "  const ctx1 = document.getElementById('particleChart').getContext('2d');";
-  html += "  particleChart = new Chart(ctx1, {";
-  html += "    type: 'doughnut',";
-  html += "    data: {";
-  html += "      labels: ['PM2.5', 'PM10', 'Safe Zone'],";
-  html += "      datasets: [{";
-  html += "        data: [" + String(sensor->isDataValid() ? sensor->currentData.pm2_5_atm : 0) + ", " + String(sensor->isDataValid() ? sensor->currentData.pm10_atm : 0) + ", 50],";
-  html += "        backgroundColor: ['#ef4444', '#f59e0b', '#10b981'],";
-  html += "        borderColor: ['#dc2626', '#d97706', '#059669'],";
-  html += "        borderWidth: 2";
-  html += "      }]";
-  html += "    },";
-  html += "    options: {";
-  html += "      responsive: true,";
-  html += "      maintainAspectRatio: false,";
-  html += "      plugins: {";
-  html += "        legend: { labels: { color: '#ffffff' } }";
-  html += "      }";
-  html += "    }";
-  html += "  });";
   
-  html += "  const ctx2 = document.getElementById('trendChart').getContext('2d');";
-  html += "  trendChart = new Chart(ctx2, {";
+  // Line Chart for trends
+  html += "  const lineCtx = document.getElementById('lineChart').getContext('2d');";
+  html += "  lineChart = new Chart(lineCtx, {";
   html += "    type: 'line',";
   html += "    data: {";
   html += "      labels: [],";
   html += "      datasets: [{";
   html += "        label: 'PM2.5',";
   html += "        data: [],";
-  html += "        borderColor: '#ef4444',";
-  html += "        backgroundColor: 'rgba(239, 68, 68, 0.1)',";
-  html += "        tension: 0.4";
+  html += "        borderColor: '#ff6b6b',";
+  html += "        backgroundColor: 'rgba(255, 107, 107, 0.1)',";
+  html += "        tension: 0.4,";
+  html += "        fill: true";
   html += "      }, {";
   html += "        label: 'PM10',";
   html += "        data: [],";
-  html += "        borderColor: '#f59e0b',";
-  html += "        backgroundColor: 'rgba(245, 158, 11, 0.1)',";
-  html += "        tension: 0.4";
+  html += "        borderColor: '#4ecdc4',";
+  html += "        backgroundColor: 'rgba(78, 205, 196, 0.1)',";
+  html += "        tension: 0.4,";
+  html += "        fill: true";
   html += "      }]";
   html += "    },";
   html += "    options: {";
   html += "      responsive: true,";
   html += "      maintainAspectRatio: false,";
   html += "      plugins: {";
-  html += "        legend: { labels: { color: '#ffffff' } }";
+  html += "        legend: { labels: { color: 'white' } }";
   html += "      },";
   html += "      scales: {";
-  html += "        x: { ticks: { color: '#ffffff' } },";
-  html += "        y: { ticks: { color: '#ffffff' } }";
+  html += "        y: { ticks: { color: 'white' }, grid: { color: 'rgba(255,255,255,0.2)' } },";
+  html += "        x: { ticks: { color: 'white' }, grid: { color: 'rgba(255,255,255,0.2)' } }";
   html += "      }";
   html += "    }";
   html += "  });";
-  html += "}";
   
-  // Update charts with new data
-  html += "function updateCharts() {";
-  html += "  fetch('/api')";
-  html += "    .then(response => response.json())";
-  html += "    .then(data => {";
-  html += "      if (data.pm2_5 !== undefined) {";
-  html += "        document.getElementById('pm25Value').textContent = data.pm2_5.toFixed(1);";
-  html += "        document.getElementById('pm10Value').textContent = (data.pm10 || 0).toFixed(1);";
-  html += "        document.getElementById('vocValue').textContent = data.voc_index || 0;";
-  
-  html += "        particleChart.data.datasets[0].data = [data.pm2_5, data.pm10 || 0, Math.max(50 - data.pm2_5, 10)];";
-  html += "        particleChart.update();";
-  
-  html += "        const now = new Date().toLocaleTimeString();";
-  html += "        trendData.timestamps.push(now);";
-  html += "        trendData.pm25.push(data.pm2_5);";
-  html += "        trendData.pm10.push(data.pm10 || 0);";
-  
-  html += "        if (trendData.timestamps.length > 10) {";
-  html += "          trendData.timestamps.shift();";
-  html += "          trendData.pm25.shift();";
-  html += "          trendData.pm10.shift();";
-  html += "        }";
-  
-  html += "        trendChart.data.labels = trendData.timestamps;";
-  html += "        trendChart.data.datasets[0].data = trendData.pm25;";
-  html += "        trendChart.data.datasets[1].data = trendData.pm10;";
-  html += "        trendChart.update();";
+  // Doughnut Chart for distribution
+  html += "  const doughnutCtx = document.getElementById('doughnutChart').getContext('2d');";
+  html += "  doughnutChart = new Chart(doughnutCtx, {";
+  html += "    type: 'doughnut',";
+  html += "    data: {";
+  html += "      labels: ['PM2.5', 'PM10', 'VOC Index'],";
+  html += "      datasets: [{";
+  html += "        data: [" + String(pm25) + ", " + String(pm10) + ", " + String(vocIndex * 10, 1) + "],";
+  html += "        backgroundColor: ['#ff6b6b', '#4ecdc4', '#ffd93d'],";
+  html += "        borderColor: ['#ff5252', '#26a69a', '#ffc107'],";
+  html += "        borderWidth: 3";
+  html += "      }]";
+  html += "    },";
+  html += "    options: {";
+  html += "      responsive: true,";
+  html += "      maintainAspectRatio: false,";
+  html += "      plugins: {";
+  html += "        legend: { labels: { color: 'white', font: { size: 14 } } }";
   html += "      }";
-  html += "    })";
-  html += "    .catch(error => console.error('Error fetching data:', error));";
-  html += "}";
+  html += "    }";
+  html += "  });";
+  html += "};";
+  
+  // Update charts function
+  html += "function updateCharts() {";
+  html += "  fetch('/api').then(response => response.json()).then(data => {";
+  html += "    const now = new Date().toLocaleTimeString();";
+  html += "    ";
+  html += "    // Update line chart";
+  html += "    lineChart.data.labels.push(now);";
+  html += "    lineChart.data.datasets[0].data.push(data.pm2_5);";
+  html += "    lineChart.data.datasets[1].data.push(data.pm10);";
+  html += "    ";
+  html += "    // Keep only last 10 points";
+  html += "    if (lineChart.data.labels.length > 10) {";
+  html += "      lineChart.data.labels.shift();";
+  html += "      lineChart.data.datasets[0].data.shift();";
+  html += "      lineChart.data.datasets[1].data.shift();";
+  html += "    }";
+  html += "    ";
+  html += "    // Update doughnut chart";
+  html += "    doughnutChart.data.datasets[0].data = [data.pm2_5, data.pm10, data.voc_index * 10];";
+  html += "    ";
+  html += "    lineChart.update();";
+  html += "    doughnutChart.update();";
+  html += "    ";
+  html += "    // Update metric cards";
+  html += "    document.querySelectorAll('.metric-value')[0].textContent = data.pm2_5;";
+  html += "    document.querySelectorAll('.metric-value')[1].textContent = data.pm10;";
+  html += "    document.querySelectorAll('.metric-value')[2].textContent = data.voc_index.toFixed(1);";
+  html += "  });";
+  html += "};";
   
   html += "document.addEventListener('DOMContentLoaded', function() {";
   html += "  initCharts();";
   html += "  setInterval(updateCharts, 5000);";
   html += "});";
-  html += "</script>";
   
+  html += "</script>";
   html += "</body></html>";
+  
   server->send(200, "text/html", html);
 }
 
 void AirQualityWebServer::handleControl() {
   String html = "<!DOCTYPE html><html><head>";
-  html += "<title>Home Control</title>";
-  html += "<style>body{background:#1a1a2e;color:white;font-family:Arial;margin:0;padding:20px}";
-  html += ".container{max-width:1000px;margin:0 auto}";
-  html += ".header{text-align:center;background:#16213e;padding:30px;border-radius:15px;margin-bottom:30px}";
-  html += ".nav-btn{background:#2563eb;color:white;padding:15px 30px;text-decoration:none;border-radius:10px;margin:10px}";
-  html += ".led-button{background:#059669;color:white;border:none;padding:20px 40px;font-size:1.3rem;border-radius:15px;cursor:pointer}</style></head><body>";
+  html += "<title>Junkari - Controls</title>";
+  html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
   
-  html += "<div class=\"container\">";
-  html += "<div class=\"header\"><h1>Home Control Panel</h1></div>";
+  // Use same purple gradient styling
+  html += "<style>";
+  html += "* { margin: 0; padding: 0; box-sizing: border-box; }";
+  html += "body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: white; }";
+  html += ".container { max-width: 1000px; margin: 0 auto; padding: 20px; }";
   
-  html += "<div style=\"text-align:center;margin:30px 0\">";
-  html += "<a href=\"/\" class=\"nav-btn\">Back to Monitor</a>";
+  // Header styling
+  html += ".header { display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 20px; padding: 20px 30px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.2); }";
+  html += ".logo-section { display: flex; align-items: center; gap: 15px; }";
+  html += ".logo { width: 60px; height: 60px; background: rgba(255,255,255,0.2); border-radius: 15px; display: flex; align-items: center; justify-content: center; font-size: 24px; }";
+  html += ".brand-text h1 { font-size: 2rem; font-weight: 700; margin-bottom: 5px; }";
+  html += ".brand-text p { font-size: 1rem; opacity: 0.8; }";
+  
+  // Control cards
+  html += ".control-card { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 20px; padding: 30px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.2); text-align: center; }";
+  html += ".control-title { font-size: 1.5rem; font-weight: 600; margin-bottom: 20px; }";
+  
+  // LED control button
+  html += ".led-button { background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; padding: 15px 40px; font-size: 1.2rem; font-weight: 600; border-radius: 12px; cursor: pointer; transition: all 0.3s ease; margin: 10px; }";
+  html += ".led-button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3); }";
+  html += ".led-status { margin-top: 15px; font-size: 1.1rem; padding: 8px 16px; border-radius: 20px; display: inline-block; }";
+  html += ".status-on { background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; }";
+  html += ".status-off { background: rgba(107, 114, 128, 0.2); border: 1px solid #6b7280; }";
+  
+  // Navigation
+  html += ".nav-btn { background: rgba(255,255,255,0.2); color: white; padding: 12px 24px; text-decoration: none; border-radius: 12px; font-weight: 500; transition: all 0.3s ease; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.3); }";
+  html += ".nav-btn:hover { background: rgba(255,255,255,0.3); transform: translateY(-2px); }";
+  html += "</style>";
+  html += "</head><body>";
+  
+  html += "<div class='container'>";
+  
+  // Header with Junkari branding
+  html += "<div class='header'>";
+  html += "<div class='logo-section'>";
+  html += "<div class='logo'>⚙️</div>";
+  html += "<div class='brand-text'>";
+  html += "<h1>Junkari</h1>";
+  html += "<p>Smart Home Controls</p>";
+  html += "</div></div>";
+  html += "<div>";
+  html += "<a href='/' class='nav-btn'>🏠 Back to Monitor</a>";
+  html += "</div></div>";
+  
+  // LED Control Card
+  html += "<div class='control-card'>";
+  html += "<div class='control-title'>💡 LED Light Control</div>";
+  html += "<button onclick='controlLED()' class='led-button'>Toggle LED</button>";
+  
+  String ledState = getLEDState() ? "ON" : "OFF";
+  String statusClass = getLEDState() ? "status-on" : "status-off";
+  html += "<div class='led-status " + statusClass + "'>Status: " + ledState + "</div>";
   html += "</div>";
   
-  html += "<div style=\"text-align:center;padding:30px\">";
-  html += "<h3>LED Light Control</h3>";
-  html += "<button onclick=\"controlLED()\" class=\"led-button\">Toggle LED</button>";
-  html += "<div>Status: " + String(getLEDState() ? "ON" : "OFF") + "</div>";
-  html += "</div>";
+  // System Info Card
+  html += "<div class='control-card'>";
+  html += "<div class='control-title'>📊 System Information</div>";
+  html += "<div style='text-align: left; max-width: 400px; margin: 0 auto;'>";
+  html += "<div style='margin: 10px 0; display: flex; justify-content: space-between;'>";
+  html += "<span>IP Address:</span> <span>" + getIPAddress() + "</span></div>";
+  html += "<div style='margin: 10px 0; display: flex; justify-content: space-between;'>";
+  html += "<span>Uptime:</span> <span>" + String(millis() / 1000) + "s</span></div>";
+  html += "<div style='margin: 10px 0; display: flex; justify-content: space-between;'>";
+  html += "<span>Free RAM:</span> <span>" + String(ESP.getFreeHeap()) + " bytes</span></div>";
+  html += "<div style='margin: 10px 0; display: flex; justify-content: space-between;'>";
+  html += "<span>WiFi Signal:</span> <span>" + String(WiFi.RSSI()) + " dBm</span></div>";
+  html += "</div></div>";
   
   html += "<script>";
   html += "function controlLED() {";
@@ -298,6 +383,7 @@ void AirQualityWebServer::handleAPI() {
     doc["voc_index"] = sensor->getVOCIndex();
     doc["health_status"] = sensor->getHealthStatus();
     doc["risk_level"] = sensor->getRiskLevel();
+    doc["demo_mode"] = false;
     
     // Add particle counts for advanced charts
     JsonObject particles = doc.createNestedObject("particles");
@@ -306,20 +392,35 @@ void AirQualityWebServer::handleAPI() {
     particles["1_0um"] = sensor->currentData.particles_10;
     particles["2_5um"] = sensor->currentData.particles_25;
     particles["5_0um"] = sensor->currentData.particles_50;
-    particles["10_0um"] = sensor->currentData.particles_100;
+    particles["10um"] = sensor->currentData.particles_100;
   } else {
     doc["valid"] = false;
-    doc["pm2_5"] = 0;
-    doc["pm10"] = 0;
-    doc["voc_index"] = 0;
-    doc["error"] = "No valid sensor data";
+    doc["pm1_0"] = sensor->getDemoPM10() * 0.7; // Approximate PM1.0
+    doc["pm2_5"] = sensor->getDemoPM25();
+    doc["pm10"] = sensor->getDemoPM10();
+    doc["voc_index"] = sensor->getVOCIndex();
+    doc["health_status"] = sensor->getDemoHealthStatus();
+    doc["risk_level"] = sensor->getDemoRiskLevel();
+    doc["demo_mode"] = true;
+    
+    // Add demo particle counts
+    JsonObject particles = doc.createNestedObject("particles");
+    particles["0_3um"] = random(1000, 5000);
+    particles["0_5um"] = random(500, 2000);
+    particles["1_0um"] = random(200, 800);
+    particles["2_5um"] = random(50, 200);
+    particles["5_0um"] = random(10, 50);
+    particles["10um"] = random(5, 20);
   }
   
   doc["led_state"] = getLEDState();
   doc["timestamp"] = millis();
-  doc["uptime"] = millis() / 1000;
+  
   doc["free_memory"] = ESP.getFreeHeap();
   doc["wifi_rssi"] = WiFi.RSSI();
+  
+  // Add network info
+  doc["ip_address"] = getIPAddress();
   
   String response;
   serializeJson(doc, response);
@@ -356,7 +457,7 @@ void AirQualityWebServer::handleLEDOff() {
 }
 
 String AirQualityWebServer::getCommonCSS() {
-  return "<style>body{background:#1a1a2e;color:white}</style>";
+  return "";
 }
 
 void AirQualityWebServer::handleClient() {

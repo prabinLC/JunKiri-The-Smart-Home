@@ -1,21 +1,53 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "PlatformIO Build",
-      "type": "shell",
-      "command": "platformio",
-      "args": ["run"],
-      "problemMatcher": ["$platformio"],
-      "group": "build"
-    },
-    {
-      "label": "PlatformIO Upload",
-      "type": "shell",
-      "command": "platformio",
-      "args": ["run", "--target", "upload"],
-      "problemMatcher": ["$platformio"],
-      "group": "build"
-    }
-  ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "PlatformIO Build",
+			"type": "shell",
+			"command": "platformio",
+			"args": [
+				"run"
+			],
+			"problemMatcher": [
+				"$platformio"
+			],
+			"group": "build"
+		},
+		{
+			"label": "PlatformIO Upload",
+			"type": "shell",
+			"command": "platformio",
+			"args": [
+				"run",
+				"--target",
+				"upload"
+			],
+			"problemMatcher": [
+				"$platformio"
+			],
+			"group": "build"
+		},
+		{
+			"label": "PlatformIO Build",
+			"type": "shell",
+			"command": "C:\\Users\\prabi\\.platformio\\penv\\Scripts\\platformio.exe",
+			"args": [
+				"run"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$platformio"
+			],
+			"group": "build"
+		},
+		{
+			"label": "PlatformIO Build",
+			"type": "shell",
+			"command": "C:\\Users\\prabi\\.platformio\\penv\\Scripts\\platformio.exe",
+			"args": [
+				"run"
+			],
+			"group": "build"
+		}
+	]
 }
