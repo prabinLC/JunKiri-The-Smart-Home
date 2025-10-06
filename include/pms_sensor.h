@@ -35,7 +35,9 @@ public:
   };
   
   AirQualityData currentData;
-  float trendData[24];        // 24-hour PM2.5 trend
+  float pm25TrendData[24];    // 24-hour PM2.5 trend
+  float vocTrendData[24];     // 24-hour VOC trend
+  float pm10TrendData[24];    // 24-hour PM10 trend
   uint8_t trendIndex;
   bool trendInitialized;
   

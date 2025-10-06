@@ -11,12 +11,24 @@ PMSSensor::PMSSensor() {
   // Initialize trend data array with fake realistic historical data (healthy pattern)
   // Simulate a daily pattern with good air quality
   float basePM25 = 8.0; // Base healthy PM2.5 level
+  float basePM10 = 12.0; // Base healthy PM10 level
+  float baseVOC = 25.0; // Base healthy VOC level
   for (int i = 0; i < 24; i++) {
     // Create a realistic daily pattern
     float hour = i;
     float dailyVariation = sin((hour - 6) * PI / 12) * 3.0; // Peak around noon, low at night
     float randomVariation = (random(-100, 100) / 100.0); // ±1.0 random variation
-    trendData[i] = max(2.0f, basePM25 + dailyVariation + randomVariation);
+    pm25TrendData[i] = max(2.0f, basePM25 + dailyVariation + randomVariation);
+    
+    // PM10 pattern (slightly higher than PM2.5)
+    float pm10DailyVariation = sin((hour - 6) * PI / 12) * 4.0; // Peak around noon
+    float pm10RandomVariation = (random(-100, 100) / 100.0); // ±1.0 random variation
+    pm10TrendData[i] = max(3.0f, basePM10 + pm10DailyVariation + pm10RandomVariation);
+    
+    // VOC pattern (higher during day, lower at night)
+    float vocDailyVariation = sin((hour - 8) * PI / 14) * 8.0; // Peak around afternoon
+    float vocRandomVariation = (random(-50, 50) / 100.0); // ±0.5 random variation
+    vocTrendData[i] = max(10.0f, baseVOC + vocDailyVariation + vocRandomVariation);
   }
   trendInitialized = true; // Start with historical data
   
@@ -116,19 +128,23 @@ void PMSSensor::updateTrend() {
   
   // Initialize trend with first valid reading
   if (!trendInitialized && currentData.pm2_5_atm > 0) {
-    trendData[trendIndex] = currentData.pm2_5_atm;
+    pm25TrendData[trendIndex] = currentData.pm2_5_atm;
+    vocTrendData[trendIndex] = getVOCIndex();
+    pm10TrendData[trendIndex] = currentData.pm10_atm;
     trendIndex = (trendIndex + 1) % 24;
     trendInitialized = true;
-    Serial.println("Trend data initialized with PM2.5: " + String(currentData.pm2_5_atm));
+    Serial.println("Trend data initialized with PM2.5: " + String(currentData.pm2_5_atm) + ", PM10: " + String(currentData.pm10_atm) + ", VOC: " + String(getVOCIndex()));
   }
   
   // Update trend data rapidly for real-time demo (every 5 seconds)
   static unsigned long lastTrendUpdate = 0;
   if (millis() - lastTrendUpdate >= 5000) {  // 5 seconds for real-time updates
-    trendData[trendIndex] = currentData.pm2_5_atm;
+    pm25TrendData[trendIndex] = currentData.pm2_5_atm;
+    vocTrendData[trendIndex] = getVOCIndex();
+    pm10TrendData[trendIndex] = currentData.pm10_atm;
     trendIndex = (trendIndex + 1) % 24;
     lastTrendUpdate = millis();
-    Serial.println("Trend updated at index " + String(trendIndex) + " with PM2.5: " + String(currentData.pm2_5_atm));
+    Serial.println("Trend updated at index " + String(trendIndex) + " with PM2.5: " + String(currentData.pm2_5_atm) + ", PM10: " + String(currentData.pm10_atm) + ", VOC: " + String(getVOCIndex()));
   }
 }
 

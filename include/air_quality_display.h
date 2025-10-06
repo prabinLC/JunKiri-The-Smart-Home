@@ -6,7 +6,8 @@
 #include "pms_sensor.h"
 
 // Pin definitions
-#define BUZZER_PIN D5  // Buzzer positive to D5
+// Pin definitions
+#define BUZZER_PIN D8  // Buzzer positive to D8
 
 // Screen modes for OLED
 enum ScreenMode { 

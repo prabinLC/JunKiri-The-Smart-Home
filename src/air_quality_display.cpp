@@ -187,10 +187,10 @@ void AirQualityDisplay::displayTrendScreen() {
   uint8_t peakHour = 0;
   
   for (uint8_t i = 0; i < 24; i++) {
-    if (sensor->trendData[i] > 0) {
+    if (sensor->pm25TrendData[i] > 0) {
       hasData = true;
-      if (sensor->trendData[i] > peak) {
-        peak = sensor->trendData[i];
+      if (sensor->pm25TrendData[i] > peak) {
+        peak = sensor->pm25TrendData[i];
         peakHour = i;
       }
     }
@@ -207,8 +207,8 @@ void AirQualityDisplay::displayTrendScreen() {
   // Draw trend graph
   u8g2->drawStr(2, 36, "24h Trend:");
   for (uint8_t i = 0; i < 24; i++) {
-    if (sensor->trendData[i] > 0) {
-      uint8_t height = map(sensor->trendData[i], 0, 100, 0, 24);
+    if (sensor->pm25TrendData[i] > 0) {
+      uint8_t height = map(sensor->pm25TrendData[i], 0, 100, 0, 24);
       u8g2->drawVLine(40 + i * 3, 62 - height, height);
     }
   }

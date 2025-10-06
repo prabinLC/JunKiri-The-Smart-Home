@@ -48,6 +48,27 @@
 				"run"
 			],
 			"group": "build"
+		},
+		{
+			"label": "PlatformIO Build",
+			"type": "shell",
+			"command": "C:\\Users\\${env:USERNAME}\\.platformio\\penv\\Scripts\\platformio.exe",
+			"args": [
+				"run"
+			],
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "PlatformIO Build",
+			"type": "shell",
+			"command": "pio run",
+			"problemMatcher": [
+				"$platformio"
+			],
+			"group": "build"
 		}
 	]
 }

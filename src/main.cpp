@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <Servo.h>
 #include "pms_sensor.h"
 #include "air_quality_display.h"
 #include "air_quality_webserver.h"
@@ -7,21 +8,73 @@
 const char* WIFI_SSID = "Kalo phone";    // Your WiFi network name
 const char* WIFI_PASS = "12345678";      // Your WiFi password
 
-// LED Control Pin
-#define LED_PIN D0  // External LED connected to D0 (GPIO 16)
+// Pin definitions
+#define LED_PIN D0       // Single LED
+// D1 = SCL (Display)
+// D2 = SDA (Display)  
+// D3 = TXD (PMS5003 sensor)
+// D4 = RST (PMS5003 sensor)
+#define SERVO_PIN D5     // Servo motor
+
+// Component states
+bool ledState = false;
+int servoPosition = 0;
 
 // Global objects
+Servo doorServo;
 PMSSensor airSensor;
 AirQualityDisplay airDisplay(&airSensor);
 AirQualityWebServer webServer(&airSensor, &airDisplay);
-
-// LED control variables
-bool ledState = false;
 
 // Timing variables
 unsigned long lastSensorRead = 0;
 unsigned long lastDisplayUpdate = 0;
 unsigned long lastSerialOutput = 0;
+
+// LED control functions
+void setLED(bool state) {
+  ledState = state;
+  digitalWrite(LED_PIN, state ? HIGH : LOW);
+  Serial.println("LED: " + String(state ? "ON" : "OFF"));
+}
+
+void toggleLED() {
+  setLED(!ledState);
+}
+
+bool getLEDState() {
+  return ledState;
+}
+
+// Servo control functions
+void setServoPosition(int angle) {
+  servoPosition = angle;
+  doorServo.write(angle);
+  Serial.println("Servo position: " + String(angle));
+}
+
+int getServoPosition() {
+  return servoPosition;
+}
+
+// Air quality alert function
+void checkAirQualityAlerts() {
+  if (airSensor.isDataValid()) {
+    float pm25 = airSensor.currentData.pm2_5_atm;
+    
+    // Alert thresholds
+    if (pm25 > 55) { // Unhealthy level
+      // Blink LED rapidly for warning
+      for(int i = 0; i < 5; i++) {
+        setLED(true);
+        delay(200);
+        setLED(false);
+        delay(200);
+      }
+      Serial.println("⚠️ AIR QUALITY ALERT: Unhealthy PM2.5 level detected: " + String(pm25));
+    }
+  }
+}
 
 void setup() {
   // Initialize serial communication
@@ -34,25 +87,28 @@ void setup() {
   
   // Initialize LED pin
   pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, LOW);  // Turn off LED initially
-  Serial.println("LED control initialized on pin D0");
+  digitalWrite(LED_PIN, LOW);
+  Serial.println("LED initialized on pin D0");
   
-  // Test LED functionality during setup
-  Serial.println("Testing LED functionality...");
-  Serial.println("Turning LED ON for 2 seconds...");
+  // Test LED functionality
+  Serial.println("Testing LED...");
   setLED(true);
   delay(2000);
-  Serial.println("Turning LED OFF for 1 second...");
   setLED(false);
   delay(1000);
   Serial.println("LED test complete!");
   
-  // Initialize display first (shows boot screen)
+  // Initialize servo
+  doorServo.attach(SERVO_PIN);
+  doorServo.write(0);
+  Serial.println("Servo initialized on pin D5");
+  
+  // Initialize display (D1=SCL, D2=SDA)
   Serial.println("Initializing OLED display...");
   airDisplay.begin();
   delay(2000);
   
-  // Initialize PMS5003 sensor
+  // Initialize PMS5003 sensor (D3=TXD, D4=RST)
   Serial.println("Initializing PMS5003 sensor...");
   airSensor.begin();
   delay(1000);
@@ -66,9 +122,6 @@ void setup() {
   if (webServer.isWiFiConnected()) {
     Serial.print("Web dashboard: http://");
     Serial.println(webServer.getIPAddress());
-    Serial.print("JSON API: http://");
-    Serial.print(webServer.getIPAddress());
-    Serial.println("/api");
   }
   Serial.println("=========================================");
   
@@ -107,6 +160,9 @@ void loop() {
       airSensor.updateTrend();
       Serial.println("Sensor data updated successfully");
       
+      // Check for air quality alerts
+      checkAirQualityAlerts();
+      
       // Print detailed data every 2 minutes
       if (millis() - lastSerialOutput >= 120000) {
         airSensor.printData();
@@ -127,66 +183,4 @@ void loop() {
   
   // Small delay to prevent overwhelming the system
   delay(50);
-}
-
-// Additional helper functions for debugging
-void printSystemStatus() {
-  Serial.println("\n=== System Status ===");
-  Serial.print("WiFi Status: ");
-  Serial.println(webServer.isWiFiConnected() ? "Connected" : "Disconnected");
-  if (webServer.isWiFiConnected()) {
-    Serial.print("IP Address: ");
-    Serial.println(webServer.getIPAddress());
-  }
-  Serial.print("Sensor Data Valid: ");
-  Serial.println(airSensor.isDataValid() ? "Yes" : "No");
-  Serial.print("Current Display Screen: ");
-  Serial.println(airDisplay.getCurrentScreen());
-  Serial.print("LED Status: ");
-  Serial.println(ledState ? "ON" : "OFF");
-  Serial.print("Free Heap: ");
-  Serial.print(ESP.getFreeHeap());
-  Serial.println(" bytes");
-  Serial.print("Uptime: ");
-  Serial.print(millis() / 1000);
-  Serial.println(" seconds");
-  Serial.println("====================\n");
-}
-
-// LED control functions
-void setLED(bool state) {
-  Serial.print("setLED() called with state: ");
-  Serial.println(state ? "HIGH" : "LOW");
-  
-  ledState = state;
-  digitalWrite(LED_PIN, state ? HIGH : LOW);
-  
-  // Read back the pin state to verify
-  int pinState = digitalRead(LED_PIN);
-  Serial.print("Pin D0 (GPIO16) physical state: ");
-  Serial.println(pinState ? "HIGH" : "LOW");
-  
-  Serial.print("LED turned ");
-  Serial.println(state ? "ON" : "OFF");
-}
-
-void toggleLED() {
-  Serial.print("toggleLED() called. Current state: ");
-  Serial.println(ledState ? "ON" : "OFF");
-  setLED(!ledState);
-}
-
-bool getLEDState() {
-  Serial.print("getLEDState() called. Returning: ");
-  Serial.println(ledState ? "true" : "false");
-  return ledState;
-}
-
-// Print system status every 5 minutes
-void checkSystemHealth() {
-  static unsigned long lastHealthCheck = 0;
-  if (millis() - lastHealthCheck >= 300000) {  // 5 minutes
-    printSystemStatus();
-    lastHealthCheck = millis();
-  }
 }
